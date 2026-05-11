@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WorkSpace</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #F7F6F3; --surface: #FFFFFF; --surface2: #F0EEE9;
+    --border: #E2DED7; --border2: #C8C4BC;
+    --text: #1A1916; --text2: #6B6860; --text3: #9E9B95;
+    --purple: #534AB7; --purple-light: #EEEDFE; --purple-dark: #3C3489;
+    --green: #1D9E75; --green-light: #E1F5EE;
+    --amber: #BA7517; --amber-light: #FAEEDA;
+    --red: #A32D2D; --red-light: #FCEBEB;
+    --blue: #185FA5; --blue-light: #E6F1FB;
+    --radius: 10px; --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08); --shadow-lg: 0 4px 16px rgba(0,0,0,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+  .layout { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+  .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  .content { padding: 24px; flex: 1; }
+  .sidebar-logo { padding: 16px 16px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 32px; height: 32px; background: var(--purple); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; }
+  .logo-name { font-size: 15px; font-weight: 600; }
+  .sidebar-scroll { flex: 1; overflow-y: auto; padding: 12px 10px; }
+  .sidebar-label { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 8px 4px; }
+  .nav-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: var(--radius-sm); font-size: 13px; color: var(--text2); cursor: pointer; border: none; background: none; width: 100%; text-align: left; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--purple-light); color: var(--purple); font-weight: 500; }
+  .nav-item i { width: 16px; text-align: center; font-size: 13px; }
+  .nav-badge { margin-left: auto; background: var(--surface2); color: var(--text3); font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 10px; }
+  .nav-item.active .nav-badge { background: var(--purple); color: white; }
+  .project-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius-sm); font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; border: 1px solid var(--border2); background: var(--surface); color: var(--text); transition: all 0.15s; }
+  .btn:hover { background: var(--surface2); }
+  .btn-primary { background: var(--purple); color: white; border-color: var(--purple); }
+  .btn-primary:hover { background: var(--purple-dark); }
+  .btn-danger { color: var(--red); border-color: #F7C1C1; }
+  .btn-danger:hover { background: var(--red-light); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .topbar-title { font-size: 16px; font-weight: 600; }
+  .topbar-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .sync-indicator { font-size: 12px; color: var(--text3); display: flex; align-items: center; gap: 5px; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .sync-dot.syncing { background: var(--amber); animation: pulse 1s infinite; }
+  .sync-dot.error { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .view-tabs { display: flex; gap: 2px; background: var(--surface2); padding: 3px; border-radius: var(--radius-sm); margin-right: 8px; }
+  .view-tab { padding: 5px 12px; border-radius: 5px; font-size: 13px; border: none; background: none; cursor: pointer; color: var(--text2); font-family: 'DM Sans', sans-serif; display: flex; align-items: center; gap: 5px; }
+  .view-tab.active { background: var(--surface); color: var(--text); font-weight: 500; box-shadow: var(--shadow); }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .stat-num { font-size: 26px; font-weight: 600; color: var(--text); }
+  .stat-label { font-size: 12px; color: var(--text3); margin-top: 3px; }
+  .stat-card.blue .stat-num { color: var(--blue); }
+  .stat-card.green .stat-num { color: var(--green); }
+  .stat-card.red .stat-num { color: var(--red); }
+  .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .project-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; cursor: pointer; transition: all 0.15s; }
+  .project-card:hover { border-color: var(--border2); box-shadow: var(--shadow); transform: translateY(-1px); }
+  .project-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .project-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; flex-shrink: 0; }
+  .project-name { font-size: 13px; font-weight: 600; }
+  .project-desc { font-size: 12px; color: var(--text3); margin-bottom: 12px; line-height: 1.4; }
+  .project-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); margin-bottom: 8px; }
+  .progress-bar { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .section-title { font-size: 14px; font-weight: 600; }
+  .board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 12px; }
+  .board::-webkit-scrollbar { height: 6px; }
+  .board::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  .col { flex-shrink: 0; width: 280px; }
+  .col-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .col-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .col-title { font-size: 13px; font-weight: 500; color: var(--text2); }
+  .col-count { font-size: 11px; color: var(--text3); background: var(--surface2); padding: 1px 7px; border-radius: 10px; margin-left: auto; }
+  .tasks-drop { min-height: 60px; display: flex; flex-direction: column; gap: 8px; padding: 4px; border-radius: var(--radius); transition: background 0.15s; }
+  .tasks-drop.drag-over { background: var(--purple-light); }
+  .task-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; cursor: grab; transition: all 0.15s; }
+  .task-card:hover { border-color: var(--border2); box-shadow: var(--shadow); }
+  .task-card.dragging { opacity: 0.4; cursor: grabbing; }
+  .task-card-top { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+  .task-card-name { font-size: 13px; font-weight: 500; line-height: 1.4; flex: 1; }
+  .task-card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .add-task-btn { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: var(--radius-sm); font-size: 12px; color: var(--text3); cursor: pointer; border: 1px dashed var(--border); background: none; width: 100%; margin-top: 8px; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .add-task-btn:hover { background: var(--surface); color: var(--text2); border-color: var(--border2); }
+  .badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+  .badge-alta { background: var(--red-light); color: var(--red); }
+  .badge-media { background: var(--amber-light); color: var(--amber); }
+  .badge-bassa { background: var(--green-light); color: var(--green); }
+  .badge-todo { background: var(--surface2); color: var(--text2); }
+  .badge-progress { background: var(--blue-light); color: var(--blue); }
+  .badge-review { background: var(--amber-light); color: var(--amber); }
+  .badge-done { background: var(--green-light); color: var(--green); }
+  .due-tag { font-size: 11px; color: var(--text3); display: flex; align-items: center; gap: 3px; margin-left: auto; }
+  .due-tag.overdue { color: var(--red); }
+  .list-table { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .list-thead { display: grid; grid-template-columns: 1fr 140px 110px 90px 90px; padding: 10px 16px; background: var(--surface2); font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+  .list-row { display: grid; grid-template-columns: 1fr 140px 110px 90px 90px; padding: 11px 16px; align-items: center; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
+  .list-row:last-child { border-bottom: none; }
+  .list-row:hover { background: var(--surface2); }
+  .list-proj { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text3); }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 999; backdrop-filter: blur(2px); }
+  .modal { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); width: 500px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+  .modal-header { padding: 20px 24px 0; display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-size: 16px; font-weight: 600; }
+  .modal-body { padding: 20px 24px; }
+  .modal-footer { padding: 0 24px 20px; display: flex; justify-content: flex-end; gap: 8px; }
+  .detail-modal { width: 580px; }
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 5px; }
+  .form-input, .form-select, .form-textarea { width: 100%; padding: 9px 12px; font-size: 13px; font-family: 'DM Sans', sans-serif; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); outline: none; transition: border 0.15s; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(83,74,183,0.12); }
+  .form-textarea { resize: vertical; min-height: 80px; }
+  .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .color-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .color-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: all 0.15s; }
+  .color-swatch.selected { border-color: var(--text); transform: scale(1.1); }
+  .detail-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 5px; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--text3); }
+  .empty-icon { font-size: 36px; margin-bottom: 12px; color: var(--border2); }
+  .loading { display: flex; align-items: center; justify-content: center; height: 200px; color: var(--text3); gap: 10px; font-size: 14px; }
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--purple); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: white; padding: 10px 18px; border-radius: var(--radius-sm); font-size: 13px; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  @media (max-width: 768px) {
+    .sidebar { width: 52px; }
+    .logo-name, .nav-item span:not(.nav-badge), .sidebar-label { display: none; }
+    .nav-item { justify-content: center; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .list-thead, .list-row { grid-template-columns: 1fr 100px 90px; }
+    .list-thead span:nth-child(n+4), .list-row > *:nth-child(n+4) { display: none; }
+    .form-row-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="fa-solid fa-layer-group"></i></div>
+      <span class="logo-name">WorkSpace</span>
+    </div>
+    <div class="sidebar-scroll">
+      <div class="sidebar-label">Navigazione</div>
+      <button class="nav-item active" onclick="goView('home',this)"><i class="fa-solid fa-house"></i><span>Dashboard</span></button>
+      <button class="nav-item" onclick="goView('mytasks',this)"><i class="fa-solid fa-check-square"></i><span>I miei task</span><span class="nav-badge" id="my-count">0</span></button>
+      <button class="nav-item" onclick="goView('board',this)"><i class="fa-solid fa-table-columns"></i><span>Kanban</span></button>
+      <button class="nav-item" onclick="goView('list',this)"><i class="fa-solid fa-list"></i><span>Lista</span></button>
+      <div class="sidebar-label" style="margin-top:8px">Progetti</div>
+      <div id="sidebar-projects"></div>
+      <button class="nav-item" style="color:var(--text3)" onclick="openModal('project')"><i class="fa-solid fa-plus"></i><span>Nuovo progetto</span></button>
+    </div>
+    <div style="padding:12px 10px;border-top:1px solid var(--border)">
+      <button class="nav-item" onclick="loadAll()"><i class="fa-solid fa-rotate"></i><span>Aggiorna</span></button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="view-tabs" id="view-tabs" style="display:none">
+        <button class="view-tab" onclick="goSubView('board')"><i class="fa-solid fa-table-columns"></i> Board</button>
+        <button class="view-tab" onclick="goSubView('list')"><i class="fa-solid fa-list"></i> Lista</button>
+      </div>
+      <span class="topbar-title" id="topbar-title">Dashboard</span>
+      <div class="topbar-actions">
+        <div class="sync-indicator"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Connesso</span></div>
+        <button class="btn btn-primary" onclick="openModal('task')"><i class="fa-solid fa-plus"></i> Nuovo task</button>
+        <button class="btn" onclick="openModal('project')"><i class="fa-regular fa-folder-open"></i> Progetto</button>
+      </div>
+    </div>
+    <div class="content" id="content"><div class="loading"><div class="spinner"></div> Caricamento dati...</div></div>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://jfldcguxkkqhnjzvwqbb.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsZGNndXhramtxaG5qenZ3cWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NjI3MzYsImV4cCI6MjA5NDAzODczNn0.lLrFPzgkPYGkCD_C24C_3MxIPNuqApBa4Chk98z6x_w';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const COLORS = ['#534AB7','#1D9E75','#D85A30','#378ADD','#D4537E','#BA7517','#A32D2D','#639922'];
+
+let state = { view:'home', subView:'board', activeProject:null, dragging:null, selectedColor:COLORS[0], projects:[], tasks:[] };
+
+function setSyncing(s) {
+  const dot = document.getElementById('sync-dot'), lbl = document.getElementById('sync-label');
+  if(s==='syncing') { dot.className='sync-dot syncing'; lbl.textContent='Salvataggio...'; }
+  else if(s==='ok') { dot.className='sync-dot'; lbl.textContent='Connesso'; }
+  else { dot.className='sync-dot error'; lbl.textContent='Errore'; }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+async function loadAll() {
+  setSyncing('syncing');
+  try {
+    const [{ data: projects, error: e1 }, { data: tasks, error: e2 }] = await Promise.all([
+      sb.from('projects').select('*').order('created_at'),
+      sb.from('tasks').select('*').order('created_at')
+    ]);
+    if(e1||e2) throw e1||e2;
+    state.projects = projects || [];
+    state.tasks = tasks || [];
+    setSyncing('ok');
+    render();
+  } catch(err) {
+    setSyncing('error');
+    showToast('Errore connessione: ' + err.message);
+  }
+}
+
+const proj = id => state.projects.find(p=>p.id===id);
+const today = () => new Date().toISOString().slice(0,10);
+const overdue = t => t.due_date && t.due_date < today() && t.status !== 'done';
+const fmtDate = d => { if(!d) return '—'; const [,m,dd] = d.slice(0,10).split('-'); return `${dd}/${m}`; };
+const statusLabel = s => ({todo:'Da fare',progress:'In corso',review:'In revisione',done:'Completato'}[s]||s);
+const prioLabel = p => ({alta:'Alta',media:'Media',bassa:'Bassa'}[p]||p);
+
+function goView(v, el) {
+  state.view=v; state.activeProject=null;
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  if(el) el.classList.add('active');
+  document.getElementById('view-tabs').style.display=(v==='board'||v==='list')?'flex':'none';
+  render();
+}
+function goSubView(sv) {
+  state.subView=sv; state.view=sv;
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  render();
+}
+function setProjectView(pid) {
+  state.activeProject=pid; state.view=state.subView;
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-tabs').style.display='flex';
+  render();
+}
+
+function render() {
+  renderSidebar();
+  const c=document.getElementById('content'), title=document.getElementById('topbar-title');
+  const ap=proj(state.activeProject);
+  if(state.view==='home') { title.textContent='Dashboard'; c.innerHTML=renderHome(); }
+  else if(state.view==='board') { title.textContent=(ap?ap.name:'Tutti i progetti')+' — Kanban'; c.innerHTML=renderBoard(); }
+  else if(state.view==='list') { title.textContent=(ap?ap.name:'Tutti i task')+' — Lista'; c.innerHTML=renderList(); }
+  else if(state.view==='mytasks') { title.textContent='I miei task'; c.innerHTML=renderMyTasks(); }
+  document.querySelectorAll('.view-tab').forEach(b=>b.classList.remove('active'));
+  if(state.view==='board') document.querySelectorAll('.view-tab')[0]?.classList.add('active');
+  if(state.view==='list') document.querySelectorAll('.view-tab')[1]?.classList.add('active');
+  const mc=document.getElementById('my-count');
+  if(mc) mc.textContent=state.tasks.filter(t=>t.status!=='done').length;
+}
+
+function renderSidebar() {
+  const el=document.getElementById('sidebar-projects'); if(!el) return;
+  el.innerHTML=state.projects.map(p=>`
+    <button class="nav-item" onclick="setProjectView('${p.id}')">
+      <span class="project-dot" style="background:${p.color}"></span>
+      <span>${p.name.length>22?p.name.slice(0,22)+'…':p.name}</span>
+    </button>`).join('');
+}
+
+function renderHome() {
+  const tasks=state.tasks;
+  const done=tasks.filter(t=>t.status==='done').length;
+  const inprog=tasks.filter(t=>t.status==='progress').length;
+  const od=tasks.filter(t=>overdue(t)).length;
+  const urgent=tasks.filter(t=>t.priority==='alta'&&t.status!=='done').sort((a,b)=>(a.due_date||'').localeCompare(b.due_date||'')).slice(0,5);
+  return `
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-num">${tasks.length}</div><div class="stat-label">Task totali</div></div>
+    <div class="stat-card blue"><div class="stat-num">${inprog}</div><div class="stat-label">In corso</div></div>
+    <div class="stat-card green"><div class="stat-num">${done}</div><div class="stat-label">Completati</div></div>
+    <div class="stat-card red"><div class="stat-num">${od}</div><div class="stat-label">Scaduti</div></div>
+  </div>
+  <div class="section-header"><span class="section-title">Progetti</span><button class="btn" onclick="openModal('project')"><i class="fa-solid fa-plus"></i> Nuovo</button></div>
+  <div class="projects-grid">
+    ${state.projects.length ? state.projects.map(p=>{
+      const pt=tasks.filter(t=>t.project_id===p.id), pd=pt.filter(t=>t.status==='done').length, pct=pt.length?Math.round(pd/pt.length*100):0;
+      return `<div class="project-card" onclick="setProjectView('${p.id}')">
+        <div class="project-card-header"><div class="project-icon" style="background:${p.color}"><i class="fa-solid fa-folder"></i></div>
+          <div class="project-name">${p.name}</div></div>
+        <div class="project-desc">${p.description||'Nessuna descrizione'}</div>
+        <div class="project-meta"><span>${pt.length} task</span><span>${pct}% completato</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${p.color}"></div></div>
+      </div>`;
+    }).join('') : '<div style="color:var(--text3);font-size:13px">Nessun progetto. Creane uno!</div>'}
+  </div>
+  <div class="section-header" style="margin-top:4px"><span class="section-title">Task priorità alta</span></div>
+  <div class="list-table">
+    <div class="list-thead"><span>Task</span><span>Progetto</span><span>Stato</span><span>Priorità</span><span>Scadenza</span></div>
+    ${urgent.length ? urgent.map(t=>renderRow(t)).join('') : '<div class="empty-state"><div class="empty-icon"><i class="fa-regular fa-circle-check"></i></div><div class="empty-text">Nessun task urgente!</div></div>'}
+  </div>`;
+}
+
+function renderRow(t) {
+  const p=proj(t.project_id), od=overdue(t);
+  return `<div class="list-row" onclick="openDetail('${t.id}')">
+    <span style="font-size:13px;font-weight:500">${t.name}</span>
+    <span class="list-proj">${p?`<span class="project-dot" style="background:${p.color}"></span><span>${p.name.slice(0,16)}</span>`:'—'}</span>
+    <span><span class="badge badge-${t.status}">${statusLabel(t.status)}</span></span>
+    <span><span class="badge badge-${t.priority}">${prioLabel(t.priority)}</span></span>
+    <span style="font-size:12px;color:${od?'var(--red)':'var(--text3)'}">${fmtDate(t.due_date)}${od?' ⚠':''}</span>
+  </div>`;
+}
+
+function renderMyTasks() {
+  const active=state.tasks.filter(t=>t.status!=='done');
+  if(!active.length) return `<div class="empty-state"><div class="empty-icon"><i class="fa-regular fa-circle-check"></i></div><div class="empty-text">Tutti i task completati!</div></div>`;
+  const byP={alta:active.filter(t=>t.priority==='alta'),media:active.filter(t=>t.priority==='media'),bassa:active.filter(t=>t.priority==='bassa')};
+  return ['alta','media','bassa'].filter(p=>byP[p].length).map(p=>`
+    <div style="margin-bottom:24px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span class="badge badge-${p}">${prioLabel(p)}</span>
+        <span style="font-size:12px;color:var(--text3)">${byP[p].length} task</span>
+      </div>
+      <div class="list-table">
+        <div class="list-thead"><span>Task</span><span>Progetto</span><span>Stato</span><span>Priorità</span><span>Scadenza</span></div>
+        ${byP[p].map(t=>renderRow(t)).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function renderBoard() {
+  const tasks=state.activeProject ? state.tasks.filter(t=>t.project_id===state.activeProject) : state.tasks;
+  const cols=[{id:'todo',label:'Da fare',color:'#888780'},{id:'progress',label:'In corso',color:'#185FA5'},{id:'review',label:'In revisione',color:'#BA7517'},{id:'done',label:'Completato',color:'#1D9E75'}];
+  return `<div class="board">${cols.map(col=>{
+    const ct=tasks.filter(t=>t.status===col.id);
+    return `<div class="col">
+      <div class="col-header">
+        <span class="col-status-dot" style="background:${col.color}"></span>
+        <span class="col-title">${col.label}</span>
+        <span class="col-count">${ct.length}</span>
+      </div>
+      <div class="tasks-drop" id="drop-${col.id}" ondragover="dOver(event,'${col.id}')" ondrop="dDrop(event,'${col.id}')" ondragleave="dLeave(event)">
+        ${ct.map(t=>renderCard(t)).join('')}
+      </div>
+      <button class="add-task-btn" onclick="openModal('task','${col.id}')"><i class="fa-solid fa-plus"></i> Aggiungi task</button>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderCard(t) {
+  const p=proj(t.project_id), od=overdue(t);
+  return `<div class="task-card" draggable="true" ondragstart="dStart(event,'${t.id}')" ondragend="dEnd(event)" onclick="openDetail('${t.id}')" id="tc-${t.id}">
+    <div class="task-card-top">
+      <span class="task-card-name">${t.name}</span>
+      <span class="badge badge-${t.priority}" style="flex-shrink:0">${prioLabel(t.priority)}</span>
+    </div>
+    <div class="task-card-meta">
+      ${p?`<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text3)"><span class="project-dot" style="background:${p.color}"></span>${p.name.slice(0,15)}</span>`:''}
+      ${t.due_date?`<span class="due-tag ${od?'overdue':''}"><i class="fa-regular fa-calendar" style="font-size:10px"></i>${fmtDate(t.due_date)}${od?' ⚠':''}</span>`:''}
+    </div>
+  </div>`;
+}
+
+function renderList() {
+  const tasks=state.activeProject ? state.tasks.filter(t=>t.project_id===state.activeProject) : state.tasks;
+  const sorted=[...tasks].sort((a,b)=>{const po={alta:0,media:1,bassa:2};return po[a.priority]-po[b.priority]||((a.due_date||'').localeCompare(b.due_date||''));});
+  return `<div class="list-table">
+    <div class="list-thead"><span>Task</span><span>Progetto</span><span>Stato</span><span>Priorità</span><span>Scadenza</span></div>
+    ${sorted.length ? sorted.map(t=>renderRow(t)).join('') : '<div class="empty-state"><div class="empty-icon"><i class="fa-regular fa-folder-open"></i></div><div class="empty-text">Nessun task</div></div>'}
+  </div>`;
+}
+
+function dStart(e,id) { state.dragging=id; setTimeout(()=>document.getElementById('tc-'+id)?.classList.add('dragging'),0); }
+function dEnd(e) { document.getElementById('tc-'+state.dragging)?.classList.remove('dragging'); document.querySelectorAll('.tasks-drop').forEach(x=>x.classList.remove('drag-over')); }
+function dOver(e,st) { e.preventDefault(); document.querySelectorAll('.tasks-drop').forEach(x=>x.classList.remove('drag-over')); document.getElementById('drop-'+st)?.classList.add('drag-over'); }
+function dLeave(e) { if(!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over'); }
+async function dDrop(e,st) {
+  e.preventDefault();
+  document.querySelectorAll('.tasks-drop').forEach(x=>x.classList.remove('drag-over'));
+  if(!state.dragging) return;
+  const t=state.tasks.find(t=>t.id===state.dragging);
+  if(t && t.status!==st) {
+    t.status=st;
+    render();
+    setSyncing('syncing');
+    const {error}=await sb.from('tasks').update({status:st}).eq('id',t.id);
+    if(error) { showToast('Errore salvataggio'); setSyncing('error'); } else { setSyncing('ok'); showToast('Stato aggiornato'); }
+  }
+  state.dragging=null;
+}
+
+function openModal(type, defaultStatus) {
+  const root=document.getElementById('modal-root');
+  if(type==='task') {
+    root.innerHTML=`<div class="overlay" onclick="maybeClose(event)"><div class="modal">
+      <div class="modal-header"><span class="modal-title">Nuovo task</span><button class="btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Nome task *</label><input class="form-input" id="f-name" placeholder="Descrivi il task…" autofocus></div>
+        <div class="form-row-2">
+          <div class="form-group"><label class="form-label">Progetto</label><select class="form-select" id="f-proj">
+            <option value="">— Nessun progetto —</option>
+            ${state.projects.map(p=>`<option value="${p.id}" ${state.activeProject===p.id?'selected':''}>${p.name}</option>`).join('')}
+          </select></div>
+          <div class="form-group"><label class="form-label">Priorità</label><select class="form-select" id="f-prio">
+            <option value="alta">🔴 Alta</option><option value="media" selected>🟡 Media</option><option value="bassa">🟢 Bassa</option>
+          </select></div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group"><label class="form-label">Stato</label><select class="form-select" id="f-status">
+            <option value="todo" ${!defaultStatus||defaultStatus==='todo'?'selected':''}>Da fare</option>
+            <option value="progress" ${defaultStatus==='progress'?'selected':''}>In corso</option>
+            <option value="review" ${defaultStatus==='review'?'selected':''}>In revisione</option>
+            <option value="done" ${defaultStatus==='done'?'selected':''}>Completato</option>
+          </select></div>
+          <div class="form-group"><label class="form-label">Scadenza</label><input type="date" class="form-input" id="f-due"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Note</label><textarea class="form-textarea" id="f-notes" placeholder="Note opzionali…"></textarea></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal()">Annulla</button>
+        <button class="btn btn-primary" id="btn-create-task" onclick="createTask()"><i class="fa-solid fa-check"></i> Crea task</button>
+      </div>
+    </div></div>`;
+  } else if(type==='project') {
+    state.selectedColor=COLORS[0];
+    root.innerHTML=`<div class="overlay" onclick="maybeClose(event)"><div class="modal">
+      <div class="modal-header"><span class="modal-title">Nuovo progetto</span><button class="btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Nome progetto *</label><input class="form-input" id="fp-name" placeholder="Nome del progetto…" autofocus></div>
+        <div class="form-group"><label class="form-label">Descrizione</label><input class="form-input" id="fp-desc" placeholder="Descrizione breve…"></div>
+        <div class="form-group"><label class="form-label">Colore</label>
+          <div class="color-picker">${COLORS.map((c,i)=>`<div class="color-swatch${i===0?' selected':''}" style="background:${c}" onclick="pickColor(this,'${c}')"></div>`).join('')}</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal()">Annulla</button>
+        <button class="btn btn-primary" id="btn-create-proj" onclick="createProject()"><i class="fa-solid fa-check"></i> Crea progetto</button>
+      </div>
+    </div></div>`;
+  }
+}
+
+function openDetail(id) {
+  const t=state.tasks.find(t=>t.id===id); if(!t) return;
+  const od=overdue(t);
+  document.getElementById('modal-root').innerHTML=`<div class="overlay" onclick="maybeClose(event)"><div class="modal detail-modal">
+    <div class="modal-header">
+      <span class="modal-title">${t.name}</span>
+      <button class="btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-grid">
+        <div class="form-group"><label class="detail-label">Stato</label>
+          <select class="form-select" onchange="updateField('${id}','status',this.value)">
+            ${['todo','progress','review','done'].map(s=>`<option value="${s}" ${t.status===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
+          </select></div>
+        <div class="form-group"><label class="detail-label">Priorità</label>
+          <select class="form-select" onchange="updateField('${id}','priority',this.value)">
+            ${['alta','media','bassa'].map(p=>`<option value="${p}" ${t.priority===p?'selected':''}>${prioLabel(p)}</option>`).join('')}
+          </select></div>
+        <div class="form-group"><label class="detail-label">Progetto</label>
+          <select class="form-select" onchange="updateField('${id}','project_id',this.value||null)">
+            <option value="">— Nessuno —</option>
+            ${state.projects.map(p=>`<option value="${p.id}" ${t.project_id===p.id?'selected':''}>${p.name}</option>`).join('')}
+          </select></div>
+        <div class="form-group"><label class="detail-label">Scadenza${od?' — <span style="color:var(--red)">Scaduto</span>':''}</label>
+          <input type="date" class="form-input" value="${t.due_date||''}" onchange="updateField('${id}','due_date',this.value||null)"></div>
+      </div>
+      <div class="form-group"><label class="detail-label">Note</label>
+        <textarea class="form-textarea" id="notes-${id}" placeholder="Aggiungi note…">${t.notes||''}</textarea>
+      </div>
+      <button class="btn" style="font-size:12px" onclick="saveNotes('${id}')"><i class="fa-solid fa-floppy-disk"></i> Salva note</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" onclick="deleteTask('${id}')"><i class="fa-solid fa-trash"></i> Elimina</button>
+      <button class="btn btn-primary" onclick="closeModal()">Chiudi</button>
+    </div>
+  </div></div>`;
+}
+
+async function updateField(id, field, value) {
+  const t=state.tasks.find(t=>t.id===id); if(!t) return;
+  t[field]=value; render(); openDetail(id);
+  setSyncing('syncing');
+  const {error}=await sb.from('tasks').update({[field]:value}).eq('id',id);
+  if(error) { showToast('Errore salvataggio'); setSyncing('error'); } else { setSyncing('ok'); }
+}
+
+async function saveNotes(id) {
+  const notes=document.getElementById('notes-'+id)?.value||'';
+  const t=state.tasks.find(t=>t.id===id); if(t) t.notes=notes;
+  setSyncing('syncing');
+  const {error}=await sb.from('tasks').update({notes}).eq('id',id);
+  if(error) { showToast('Errore salvataggio'); setSyncing('error'); } else { setSyncing('ok'); showToast('Note salvate'); }
+}
+
+async function deleteTask(id) {
+  if(!confirm('Eliminare questo task?')) return;
+  state.tasks=state.tasks.filter(t=>t.id!==id);
+  closeModal(); render();
+  setSyncing('syncing');
+  const {error}=await sb.from('tasks').delete().eq('id',id);
+  if(error) { showToast('Errore eliminazione'); setSyncing('error'); } else { setSyncing('ok'); showToast('Task eliminato'); }
+}
+
+async function createTask() {
+  const name=document.getElementById('f-name').value.trim(); if(!name) return;
+  const btn=document.getElementById('btn-create-task'); if(btn) btn.disabled=true;
+  const newTask={ name, project_id:document.getElementById('f-proj').value||null, priority:document.getElementById('f-prio').value, status:document.getElementById('f-status').value, due_date:document.getElementById('f-due').value||null, notes:document.getElementById('f-notes').value||'' };
+  setSyncing('syncing');
+  const {data,error}=await sb.from('tasks').insert(newTask).select().single();
+  if(error) { showToast('Errore creazione task'); setSyncing('error'); if(btn) btn.disabled=false; return; }
+  state.tasks.push(data);
+  setSyncing('ok'); showToast('Task creato!');
+  closeModal(); render();
+}
+
+async function createProject() {
+  const name=document.getElementById('fp-name').value.trim(); if(!name) return;
+  const btn=document.getElementById('btn-create-proj'); if(btn) btn.disabled=true;
+  const newProj={ name, color:state.selectedColor, description:document.getElementById('fp-desc').value||'' };
+  setSyncing('syncing');
+  const {data,error}=await sb.from('projects').insert(newProj).select().single();
+  if(error) { showToast('Errore creazione progetto'); setSyncing('error'); if(btn) btn.disabled=false; return; }
+  state.projects.push(data);
+  setSyncing('ok'); showToast('Progetto creato!');
+  closeModal(); render();
+}
+
+function pickColor(el,c) { document.querySelectorAll('.color-swatch').forEach(x=>x.classList.remove('selected')); el.classList.add('selected'); state.selectedColor=c; }
+function closeModal() { document.getElementById('modal-root').innerHTML=''; }
+function maybeClose(e) { if(e.target.classList.contains('overlay')) closeModal(); }
+
+loadAll();
+</script>
+</body>
+</html>
