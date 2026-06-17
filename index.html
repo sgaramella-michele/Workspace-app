@@ -192,7 +192,7 @@
 
 <script>
 const SUPABASE_URL = 'https://jfldcguxkkqhnjzvwqbb.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmbGRjZ3V4a2txaG5qenZ3cWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NjI3MzYsImV4cCI6MjA5NDAzODczNn0.lLrFPzgkPYGkCD_C24C_3MxIPNuqApBa4Chk98z6x_w';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsZGNndXhramtxaG5qenZ3cWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NjI3MzYsImV4cCI6MjA5NDAzODczNn0.lLrFPzgkPYGkCD_C24C_3MxIPNuqApBa4Chk98z6x_w';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const COLORS = ['#534AB7','#1D9E75','#D85A30','#378ADD','#D4537E','#BA7517','#A32D2D','#639922'];
@@ -223,11 +223,73 @@ async function loadAll() {
     state.tasks = tasks || [];
     setSyncing('ok');
     render();
+    setTimeout(() => { checkNotifications(); checkMondaySummary(); }, 800);
   } catch(err) {
     setSyncing('error');
     showToast('Errore connessione: ' + err.message);
   }
 }
+
+function checkNotifications() {
+  const todayStr = today();
+  const in3days = new Date(); in3days.setDate(in3days.getDate() + 3);
+  const in3Str = in3days.toISOString().slice(0,10);
+  const active = state.tasks.filter(t => t.status !== 'done');
+  const scaduti = active.filter(t => t.due_date && t.due_date < todayStr);
+  const inScadenza = active.filter(t => t.due_date && t.due_date >= todayStr && t.due_date <= in3Str);
+  const altaPriorita = active.filter(t => t.priority === 'alta');
+  if(scaduti.length === 0 && inScadenza.length === 0 && altaPriorita.length === 0) return;
+  showNotificationPanel(scaduti, inScadenza, altaPriorita);
+}
+
+function showNotificationPanel(scaduti, inScadenza, altaPriorita) {
+  const existing = document.getElementById('notif-panel');
+  if(existing) existing.remove();
+  const panel = document.createElement('div');
+  panel.id = 'notif-panel';
+  panel.style.cssText = 'position:fixed;bottom:24px;right:24px;width:340px;max-height:80vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.15);z-index:998;overflow:hidden;display:flex;flex-direction:column;';
+  const sections = [];
+  if(scaduti.length > 0) {
+    sections.push('<div style="padding:12px 16px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:14px">🔴</span><span style="font-size:12px;font-weight:600;color:var(--red)">Scaduti ('+scaduti.length+')</span></div>'+scaduti.slice(0,3).map(t=>'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer" onclick="closeNotifPanel();openDetail(''+t.id+'')"><span style="font-size:11px;color:var(--text);flex:1;line-height:1.3">'+t.name+'</span><span style="font-size:10px;color:var(--red);white-space:nowrap">'+fmtDate(t.due_date)+'</span></div>').join('')+(scaduti.length>3?'<div style="font-size:11px;color:var(--text3);margin-top:4px">+'+( scaduti.length-3)+' altri</div>':'')+'</div>');
+  }
+  if(inScadenza.length > 0) {
+    sections.push('<div style="padding:12px 16px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:14px">🟡</span><span style="font-size:12px;font-weight:600;color:var(--amber)">In scadenza entro 3 giorni ('+inScadenza.length+')</span></div>'+inScadenza.slice(0,3).map(t=>'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer" onclick="closeNotifPanel();openDetail(''+t.id+'')"><span style="font-size:11px;color:var(--text);flex:1;line-height:1.3">'+t.name+'</span><span style="font-size:10px;color:var(--amber);white-space:nowrap">'+fmtDate(t.due_date)+'</span></div>').join('')+(inScadenza.length>3?'<div style="font-size:11px;color:var(--text3);margin-top:4px">+'+(inScadenza.length-3)+' altri</div>':'')+'</div>');
+  }
+  if(altaPriorita.length > 0) {
+    sections.push('<div style="padding:12px 16px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:14px">⚡</span><span style="font-size:12px;font-weight:600;color:var(--purple)">Alta priorità aperti ('+altaPriorita.length+')</span></div>'+altaPriorita.slice(0,3).map(t=>'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer" onclick="closeNotifPanel();openDetail(''+t.id+'')"><span style="font-size:11px;color:var(--text);flex:1;line-height:1.3">'+t.name+'</span><span class="badge badge-'+t.status+'" style="font-size:9px;flex-shrink:0">'+statusLabel(t.status)+'</span></div>').join('')+(altaPriorita.length>3?'<div style="font-size:11px;color:var(--text3);margin-top:4px">+'+(altaPriorita.length-3)+' altri</div>':'')+'</div>');
+  }
+  panel.innerHTML = '<div style="padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">🔔</span><span style="font-size:13px;font-weight:600">Promemoria</span></div><button onclick="closeNotifPanel()" style="border:none;background:none;cursor:pointer;color:var(--text3);font-size:18px;padding:2px 6px;line-height:1">×</button></div><div style="overflow-y:auto;flex:1">'+sections.join('')+'</div><div style="padding:10px 16px;border-top:1px solid var(--border);flex-shrink:0"><button onclick="closeNotifPanel()" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);font-size:12px;font-family:DM Sans,sans-serif;cursor:pointer;color:var(--text2)">Chiudi</button></div>';
+  document.body.appendChild(panel);
+}
+
+function closeNotifPanel() { document.getElementById('notif-panel')?.remove(); }
+
+function checkMondaySummary() {
+  const now = new Date();
+  if(now.getDay() !== 1) return;
+  const thisMonday = now.toISOString().slice(0,10);
+  const lastMonday = localStorage.getItem('ws_last_monday');
+  if(lastMonday === thisMonday) return;
+  localStorage.setItem('ws_last_monday', thisMonday);
+  const alta = state.tasks.filter(t => t.priority === 'alta' && t.status !== 'done');
+  if(alta.length === 0) return;
+  setTimeout(() => showMondayPanel(alta), 1500);
+}
+
+function showMondayPanel(alta) {
+  const overlay = document.createElement('div');
+  overlay.id = 'monday-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;backdrop-filter:blur(2px)';
+  overlay.onclick = closeMondayPanel;
+  const panel = document.createElement('div');
+  panel.id = 'monday-panel';
+  panel.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;max-width:95vw;max-height:80vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.2);z-index:1000;overflow:hidden;display:flex;flex-direction:column;';
+  panel.innerHTML = '<div style="padding:20px 20px 14px;border-bottom:1px solid var(--border)"><div style="font-size:20px;margin-bottom:6px">📋 Buon lunedi!</div><div style="font-size:13px;color:var(--text2)">Hai <strong>'+alta.length+' task ad alta priorita</strong> ancora aperti:</div></div><div style="overflow-y:auto;flex:1;padding:12px 20px">'+alta.map(t=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="closeMondayPanel();openDetail(''+t.id+'')"><span style="font-size:13px;flex:1;line-height:1.4">'+t.name+'</span><div style="text-align:right;flex-shrink:0"><span class="badge badge-'+t.status+'" style="font-size:9px">'+statusLabel(t.status)+'</span>'+(t.due_date?'<div style="font-size:10px;color:'+(t.due_date<today()?'var(--red)':'var(--text3)')+';margin-top:3px">'+fmtDate(t.due_date)+'</div>':'')+'</div></div>').join('')+'</div><div style="padding:14px 20px;border-top:1px solid var(--border)"><button onclick="closeMondayPanel()" style="width:100%;padding:9px;border-radius:6px;border:none;background:var(--purple);color:white;font-size:13px;font-family:DM Sans,sans-serif;cursor:pointer;font-weight:500">Inizia la settimana 💪</button></div>';
+  document.body.appendChild(overlay);
+  document.body.appendChild(panel);
+}
+
+function closeMondayPanel() { document.getElementById('monday-panel')?.remove(); document.getElementById('monday-overlay')?.remove(); }
 
 const proj = id => state.projects.find(p=>p.id===id);
 const today = () => new Date().toISOString().slice(0,10);
